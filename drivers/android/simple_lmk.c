@@ -487,7 +487,7 @@ static int simple_lmk_init_set(const char *val, const struct kernel_param *kp)
 {
 	static atomic_t init_done = ATOMIC_INIT(0);
 	struct task_struct *thread;
-	struct sysinfo i;
+	unsigned long total_mb = 0;
 
 	if (!atomic_cmpxchg(&init_done, 0, 1)) {
 		thread = kthread_run(simple_lmk_reaper_thread, NULL,
@@ -499,8 +499,8 @@ static int simple_lmk_init_set(const char *val, const struct kernel_param *kp)
 		BUG_ON(vmpressure_notifier_register(&vmpressure_notif));
 	}
 
-	si_meminfo(&i);
-	if (i.totalram << (PAGE_SHIFT-10) > 3072ull * 1024) {
+	total_mb = totalram_pages >> (20 - PAGE_SHIFT);
+	if (total_mb > 3072) {
 	  // 4GB+ variant
 	  slmk_minfree = 128;
 	  slmk_timeout = 200;
@@ -510,6 +510,8 @@ static int simple_lmk_init_set(const char *val, const struct kernel_param *kp)
 	  slmk_timeout = 200;
 	}
 
+	pr_info_once("Detected %lu megabytes of device RAM, setting minfree to %hu with timeout of %hu\n",
+		total_mb, slmk_minfree, slmk_timeout);
 	return 0;
 }
 
