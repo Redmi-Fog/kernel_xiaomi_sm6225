@@ -55,10 +55,10 @@ if [[ $1 = "-rf" || $1 = "--regen-full" ]]; then
 fi
 
 echo -e "\nStarting compilation...\n"
-make -j$(nproc --all) O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 Image.gz dtb.img dtbo.img 2> >(tee log.txt >&2) || exit $?
+make -j$(nproc --all) O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 Image.gz dtb dtbo.img 2> >(tee log.txt >&2) || exit $?
 
 kernel="out/arch/arm64/boot/Image.gz"
-dtb="out/arch/arm64/boot/dtb.img"
+dtb="out/arch/arm64/boot/dtb"
 dtbo="out/arch/arm64/boot/dtbo.img"
 
 if [ -f "$kernel" ]; then
