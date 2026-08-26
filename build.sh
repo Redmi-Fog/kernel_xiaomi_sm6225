@@ -55,13 +55,22 @@ if [[ $1 = "-rf" || $1 = "--regen-full" ]]; then
 fi
 
 echo -e "\nStarting compilation...\n"
-make -j$(nproc --all) O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 Image.gz dtb.img dtbo.img 2> >(tee log.txt >&2) || exit $?
+# 1. Build Image.gz, individual DTBs (dtbs), and dtbo.img
+make -j$(nproc --all) O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 Image.gz dtbs dtbo.img 2> >(tee log.txt >&2) || exit $?
+
+# 2. Concatenate individual compiled DTBs into a single dtb image file
+# (Qualcomm Bengal/Fog DTB output path)
+if [ -d "out/arch/arm64/boot/dts/vendor/qcom" ]; then
+    cat out/arch/arm64/boot/dts/vendor/qcom/*.dtb > out/arch/arm64/boot/dtb
+elif [ -d "out/arch/arm64/boot/dts/qcom" ]; then
+    cat out/arch/arm64/boot/dts/qcom/*.dtb > out/arch/arm64/boot/dtb
+fi
 
 kernel="out/arch/arm64/boot/Image.gz"
-dtb="out/arch/arm64/boot/dtb.img"
+dtb="out/arch/arm64/boot/dtb"
 dtbo="out/arch/arm64/boot/dtbo.img"
 
-if [ -f "$kernel" ]; then
+if [ -f "$kernel" ] && [ -f "$dtb" ]; then
 	echo -e "\nKernel compiled successfully! Zipping up...\n"
 	if [ -d "$AK3_DIR" ]; then
 		cp -r "$AK3_DIR" AnyKernel3
@@ -69,7 +78,7 @@ if [ -f "$kernel" ]; then
 		echo -e "\nAnyKernel3 repo not found locally and couldn't clone from GitHub! Aborting..."
 		exit 1
 	fi
-	cp $kernel $dtb $dtbo AnyKernel3
+	cp "$kernel" "$dtb" "$dtbo" AnyKernel3/
 	cd AnyKernel3
 	git checkout master &> /dev/null
 	zip -r9 "../$ZIPNAME" * -x .git README.md *placeholder
@@ -78,6 +87,6 @@ if [ -f "$kernel" ]; then
 	echo -e "\nCompleted in $((SECONDS / 60)) minute(s) and $((SECONDS % 60)) second(s) !"
 	echo "Zip: $ZIPNAME"
 else
-	echo -e "\nCompilation failed!"
+	echo -e "\nCompilation failed! Missing kernel or dtb output."
 	exit 1
 fi
