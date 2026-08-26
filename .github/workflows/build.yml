@@ -1,0 +1,108 @@
+name: Build and Release Kernel
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Build Environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential bc bison flex libssl-dev libelf-dev zip clang llvm
+
+      - name: Compile Kernel and Create Zip
+        run: |
+          # Set architecture and toolchain environment
+          export ARCH=arm64
+          export SUBARCH=arm64
+          
+          # 1. Configure the Kernel (Replace with your actual defconfig name)
+          make O=out ARCH=arm64 fog_defconfig
+
+          # 2. Compile Kernel, DTBS, and DTBO
+          make -j$(nproc --all) O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 Image.gz dtbs dtbo.img
+
+          # Define output paths
+          KERNEL="out/arch/arm64/boot/Image.gz"
+          DTBO="out/arch/arm64/boot/dtbo.img"
+          
+          # Find DTB (Check standard output path or fallback qcom path)
+          if [ -f "out/arch/arm64/boot/dtb" ]; then
+            DTB="out/arch/arm64/boot/dtb"
+          elif [ -f "out/arch/arm64/boot/dts/qcom/dtb" ]; then
+            DTB="out/arch/arm64/boot/dts/qcom/dtb"
+          else
+            DTB=""
+          fi
+
+          # Verify compiled kernel binaries
+          if [ ! -f "$KERNEL" ]; then
+            echo "ERROR: Kernel image ($KERNEL) not found!" && exit 1
+          fi
+          if [ -z "$DTB" ] || [ ! -f "$DTB" ]; then
+            echo "ERROR: DTB file not found!" && exit 1
+          fi
+          if [ ! -f "$DTBO" ]; then
+            echo "ERROR: DTBO image ($DTBO) not found!" && exit 1
+          fi
+
+          # Copy individual build artifacts to release folder
+          mkdir -p release_files
+          cp "$KERNEL" release_files/
+          cp "$DTB" release_files/dtb.img
+          cp "$DTBO" release_files/
+
+          # 3. Setup AnyKernel3 and package zip
+          git clone -q https://github.com/CHRISL7/AnyKernel3 -b master AnyKernel3
+          cp "$KERNEL" "$DTB" "$DTBO" AnyKernel3/
+          
+          ZIP_NAME="Kernel-fog-$(date +%Y%m%d-%H%M).zip"
+          cd AnyKernel3
+          zip -r9 "../release_files/$ZIP_NAME" * -x .git README.md *placeholder
+          cd ..
+
+          # 4. Create boot.img (If Magisk/mkbootimg tools are available in repo or AnyKernel3)
+          # Copies dtb.img into boot.img setup if required by your device rules
+          if [ -f "release_files/$ZIP_NAME" ]; then
+            echo "AnyKernel Zip created successfully: $ZIP_NAME"
+          else
+            echo "ERROR: Zip file creation failed!" && exit 1
+          fi
+
+      - name: Verify All Artifacts Before Upload
+        run: |
+          echo "Checking artifact existence in release_files/..."
+          
+          # Strict file existence checks
+          ls -l release_files/
+          
+          [ -f release_files/Image.gz ] || { echo "Missing Image.gz"; exit 1; }
+          [ -f release_files/dtb.img ] || { echo "Missing dtb.img"; exit 1; }
+          [ -f release_files/dtbo.img ] || { echo "Missing dtbo.img"; exit 1; }
+          
+          # Ensure at least one .zip file exists
+          count=$(ls release_files/*.zip 2>/dev/null | wc -l)
+          if [ "$count" -eq 0 ]; then
+            echo "ERROR: No release zip found!"
+            exit 1
+          fi
+          
+          echo "All checks passed! Proceeding to Release stage."
+
+      - name: Upload Artifacts to Release
+        uses: softprops/action-gh-release@v1
+        if: success()
+        with:
+          tag_name: kernel-${{ github.run_id }}
+          name: Kernel Build Release #${{ github.run_id }}
+          files: release_files/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
