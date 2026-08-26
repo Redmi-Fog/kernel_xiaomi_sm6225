@@ -70,7 +70,6 @@ if [ -f "$kernel" ]; then
 		exit 1
 	fi
 	cp $kernel $dtb $dtbo AnyKernel3
-	rm -rf out/arch/arm64/boot
 	cd AnyKernel3
 	git checkout master &> /dev/null
 	zip -r9 "../$ZIPNAME" * -x .git README.md *placeholder
