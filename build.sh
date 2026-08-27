@@ -4,7 +4,7 @@
 # Copyright (C) 2020-2021 Adithya R.
 
 SECONDS=0 # builtin bash timer
-ZIPNAME="AETHER.XXKSU.FOG.$(date '+%d%m%Y-%H%M').zip"
+ZIPNAME="AETHER.XXKSU.FOG.$(date '+%d%m%Y%H%M').zip"
 TC_DIR="$(pwd)/tc/clang-r450784e"
 AK3_DIR="$(pwd)/android/AnyKernel3"
 
