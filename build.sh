@@ -1,92 +1,60 @@
-#!/bin/bash
-#
-# Compile script for vauxite Kernel
-# Copyright (C) 2020-2021 Adithya R.
+name: Build Kernel
 
-SECONDS=0 # builtin bash timer
-ZIPNAME="NoName-fog-$(date '+%Y%m%d-%H%M').zip"
-TC_DIR="$(pwd)/tc/clang-r450784e"
-AK3_DIR="$(pwd)/android/AnyKernel3"
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
 
-BASE_DEFCONFIG="vendor/bengal-perf_defconfig"
-FOG_CONFIG="vendor/xiaomi/fog.config"
-KSU_CONFIG="vendor/ksu.config"
+# Grant write permissions to upload releases
+permissions:
+  contents: write
 
-if test -z "$(git rev-parse --show-cdup 2>/dev/null)" &&
-   head=$(git rev-parse --verify HEAD 2>/dev/null); then
-	ZIPNAME="${ZIPNAME::-4}-$(echo $head | cut -c1-8).zip"
-fi
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-export PATH="$TC_DIR/bin:$PATH"
-export KBUILD_BUILD_USER=dp02xd
-export KBUILD_BUILD_HOST=android-build
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential bc bison flex libssl-dev libelf-dev zip clang llvm
 
-if ! [ -d "$TC_DIR" ]; then
-	echo "AOSP clang not found! Cloning to $TC_DIR..."
-	if ! git clone --depth=1 -b 14 https://gitlab.com/ThankYouMario/android_prebuilts_clang-standalone "$TC_DIR"; then
-		echo "Cloning failed! Aborting..."
-		exit 1
-	fi
-fi
+      - name: Run Kernel Build Script
+        run: |
+          chmod +x build.sh
+          ./build.sh
 
-if [[ $1 = "-c" || $1 = "--clean" ]]; then
-	rm -rf out
-fi
+      - name: Verify Artifacts Before Release
+        run: |
+          echo "Verifying build outputs..."
+          
+          # Check for Kernel Image, DTBO, and DTB
+          [ -f out/arch/arm64/boot/Image.gz ] || { echo "ERROR: Image.gz missing!"; exit 1; }
+          [ -f out/arch/arm64/boot/dtbo.img ] || { echo "ERROR: dtbo.img missing!"; exit 1; }
+          [ -f out/arch/arm64/boot/dtb ] || { echo "ERROR: dtb missing!"; exit 1; }
 
-mkdir -p out
+          # Ensure the AnyKernel zip was created
+          count=$(ls *.zip 2>/dev/null | wc -l)
+          if [ "$count" -eq 0 ]; then
+            echo "ERROR: No AnyKernel zip found in workspace!"
+            exit 1
+          fi
 
-echo -e "\nMerging configuration fragments for fog..."
-MAKE_ARGS="ARCH=arm64" ARCH=arm64 ./scripts/kconfig/merge_config.sh -O out \
-	"arch/arm64/configs/$BASE_DEFCONFIG" \
-	"arch/arm64/configs/$FOG_CONFIG" \
-	"arch/arm64/configs/$KSU_CONFIG" || exit 1
+          echo "All checks passed successfully!"
 
-if [[ $1 = "-r" || $1 = "--regen" ]]; then
-	make O=out ARCH=arm64 savedefconfig
-	cp out/defconfig arch/arm64/configs/vendor/fog-perf_defconfig
-	echo -e "\nSuccessfully saved merged defconfig to arch/arm64/configs/vendor/fog-perf_defconfig"
-	exit 0
-fi
-
-if [[ $1 = "-rf" || $1 = "--regen-full" ]]; then
-	cp out/.config arch/arm64/configs/vendor/fog-perf_defconfig
-	echo -e "\nSuccessfully saved full combined config to arch/arm64/configs/vendor/fog-perf_defconfig"
-	exit 0
-fi
-
-echo -e "\nStarting compilation...\n"
-# 1. Build Image.gz, individual DTBs (dtbs), and dtbo.img
-make -j$(nproc --all) O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 Image.gz dtbs dtbo.img 2> >(tee log.txt >&2) || exit $?
-
-# 2. Concatenate individual compiled DTBs into a single dtb image file
-# (Qualcomm Bengal/Fog DTB output path)
-if [ -d "out/arch/arm64/boot/dts/vendor/qcom" ]; then
-    cat out/arch/arm64/boot/dts/vendor/qcom/*.dtb > out/arch/arm64/boot/dtb
-elif [ -d "out/arch/arm64/boot/dts/qcom" ]; then
-    cat out/arch/arm64/boot/dts/qcom/*.dtb > out/arch/arm64/boot/dtb
-fi
-
-kernel="out/arch/arm64/boot/Image.gz"
-dtb="out/arch/arm64/boot/dtb"
-dtbo="out/arch/arm64/boot/dtbo.img"
-
-if [ -f "$kernel" ] && [ -f "$dtb" ]; then
-	echo -e "\nKernel compiled successfully! Zipping up...\n"
-	if [ -d "$AK3_DIR" ]; then
-		cp -r "$AK3_DIR" AnyKernel3
-	elif ! git clone -q https://github.com/CHRISL7/AnyKernel3 -b master; then
-		echo -e "\nAnyKernel3 repo not found locally and couldn't clone from GitHub! Aborting..."
-		exit 1
-	fi
-	cp "$kernel" "$dtb" "$dtbo" AnyKernel3/
-	cd AnyKernel3
-	git checkout master &> /dev/null
-	zip -r9 "../$ZIPNAME" * -x .git README.md *placeholder
-	cd ..
-	rm -rf AnyKernel3
-	echo -e "\nCompleted in $((SECONDS / 60)) minute(s) and $((SECONDS % 60)) second(s) !"
-	echo "Zip: $ZIPNAME"
-else
-	echo -e "\nCompilation failed! Missing kernel or dtb output."
-	exit 1
-fi
+      - name: Create Release and Upload Files
+        uses: softprops/action-gh-release@v1
+        if: success()
+        with:
+          tag_name: kernel-${{ github.run_id }}
+          name: Kernel Release #${{ github.run_id }}
+          files: |
+            out/arch/arm64/boot/Image.gz
+            out/arch/arm64/boot/dtbo.img
+            out/arch/arm64/boot/dtb
+            *.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
