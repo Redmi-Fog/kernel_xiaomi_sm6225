@@ -4,18 +4,13 @@
 # Copyright (C) 2020-2021 Adithya R.
 
 SECONDS=0 # builtin bash timer
-ZIPNAME="NoName-fog-$(date '+%Y%m%d-%H%M').zip"
+ZIPNAME="aether-xxksu-fog-$(date '+%d%m%Y').zip"
 TC_DIR="$(pwd)/tc/clang-r450784e"
 AK3_DIR="$(pwd)/android/AnyKernel3"
 
 BASE_DEFCONFIG="vendor/bengal-perf_defconfig"
 FOG_CONFIG="vendor/xiaomi/fog.config"
 KSU_CONFIG="vendor/ksu.config"
-
-if test -z "$(git rev-parse --show-cdup 2>/dev/null)" &&
-   head=$(git rev-parse --verify HEAD 2>/dev/null); then
-	ZIPNAME="${ZIPNAME::-4}-$(echo $head | cut -c1-8).zip"
-fi
 
 export PATH="$TC_DIR/bin:$PATH"
 export KBUILD_BUILD_USER=dp02xd
@@ -34,6 +29,8 @@ if [[ $1 = "-c" || $1 = "--clean" ]]; then
 fi
 
 mkdir -p out
+
+curl -LSs "https://raw.githubusercontent.com/backslashxx/KernelSU/refs/heads/master/kernel/setup.sh" | bash -s master
 
 echo -e "\nMerging configuration fragments for fog..."
 MAKE_ARGS="ARCH=arm64" ARCH=arm64 ./scripts/kconfig/merge_config.sh -O out \
@@ -90,4 +87,3 @@ else
 	echo -e "\nCompilation failed! Missing kernel or dtb output."
 	exit 1
 fi
-
