@@ -30,7 +30,7 @@ fi
 
 mkdir -p out
 
-curl -LSs "https://raw.githubusercontent.com/backslashxx/KernelSU/refs/heads/master/kernel/setup.sh" | bash -s master
+curl -LSs "https://raw.githubusercontent.com/backslashxx/KernelSU/refs/heads/master/kernel/setup.sh" | bash -s aether
 
 echo -e "\nMerging configuration fragments for fog..."
 MAKE_ARGS="ARCH=arm64" ARCH=arm64 ./scripts/kconfig/merge_config.sh -O out \
