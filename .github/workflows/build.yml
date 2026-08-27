@@ -32,6 +32,7 @@ jobs:
           echo "Verifying build outputs..."
           
           # Check for Kernel Image, DTBO, and DTB
+          ls
           [ -f out/arch/arm64/boot/Image.gz ] || { echo "ERROR: Image.gz missing!"; exit 1; }
           [ -f out/arch/arm64/boot/dtbo.img ] || { echo "ERROR: dtbo.img missing!"; exit 1; }
           [ -f out/arch/arm64/boot/dtb ] || { echo "ERROR: dtb missing!"; exit 1; }
