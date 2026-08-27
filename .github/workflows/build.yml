@@ -42,12 +42,16 @@ jobs:
 
           echo "All checks passed successfully!"
 
+      - name: Get Build date
+        id: date
+        run: echo "DATE=$(date +'%Y.%m.%d-%H%M')" >> $GITHUB_OUTPUT
+
       - name: Create Release and Upload Files
         uses: softprops/action-gh-release@v1
         if: success()
         with:
-          #tag_name: kernel-${{ github.run_id }}
-          name: Release ${{ github.run_id }}
+          tag_name: ${{ github.run_id }}
+          name: ${{ steps.date.outputs.DATE }}
           files: |
             out/arch/arm64/boot/Image.gz
             out/arch/arm64/boot/dtbo.img
