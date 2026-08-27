@@ -2,11 +2,7 @@ name: Build Kernel
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
 
-# Grant write permissions to upload releases
 permissions:
   contents: write
 
@@ -50,8 +46,8 @@ jobs:
         uses: softprops/action-gh-release@v1
         if: success()
         with:
-          tag_name: kernel-${{ github.run_id }}
-          name: Kernel Release #${{ github.run_id }}
+          #tag_name: kernel-${{ github.run_id }}
+          name: Release ${{ github.run_id }}
           files: |
             out/arch/arm64/boot/Image.gz
             out/arch/arm64/boot/dtbo.img
