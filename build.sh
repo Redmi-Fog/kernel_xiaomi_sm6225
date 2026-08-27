@@ -2,9 +2,6 @@ name: Build Kernel
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
 
 # Grant write permissions to upload releases
 permissions:
