@@ -44,7 +44,7 @@ jobs:
 
       - name: Get Build date
         id: date
-        run: echo "DATE=$(date +'%Y.%m.%d-%H%M')" >> $GITHUB_OUTPUT
+        run: echo "DATE=$(date +'%d%m%Y%H%M')" >> $GITHUB_OUTPUT
 
       - name: Create Release and Upload Files
         uses: softprops/action-gh-release@v1
