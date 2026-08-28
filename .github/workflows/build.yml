@@ -53,9 +53,9 @@ jobs:
           tag_name: ${{ github.run_id }}
           name: ${{ steps.date.outputs.DATE }}
           files: |
-            out/arch/arm64/boot/Image.gz
-            out/arch/arm64/boot/dtbo.img
-            out/arch/arm64/boot/dtb
+            #out/arch/arm64/boot/Image.gz
+            #out/arch/arm64/boot/dtbo.img
+            #out/arch/arm64/boot/dtb
             *.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
