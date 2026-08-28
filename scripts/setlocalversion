@@ -8,7 +8,6 @@
 # (see MAINTAINERS) and CC Nico Schottelius
 # <nico-linuxsetlocalversion -at- schottelius.org>.
 #
-#
 
 usage() {
 	echo "Usage: $0 [--save-scmversion] [srctree] [branch] [kmi-generation]" >&2
@@ -61,12 +60,20 @@ scm_version()
 		short=true
 	fi
 
+	# Check for git repo
+	if head=`git rev-parse --verify --short HEAD 2>/dev/null`; then
+		if $short; then
+			printf '%s' "$head"
+		else
+			printf -- '-g%s' "$head"
+		fi
+		return
+	fi
+
 	# Check for svn and a svn repo.
 	if rev=`LANG= LC_ALL= LC_MESSAGES=C svn info 2>/dev/null | grep '^Last Changed Rev'`; then
 		rev=`echo $rev | awk '{print $NF}'`
 		printf -- '-svn%s' "$rev"
-
-		# All done with svn
 		return
 	fi
 }
@@ -103,27 +110,19 @@ else
 	exit 1
 fi
 
-# localversion* files in the build and source directory
-res="$(collect_files localversion*)"
-if test ! "$srctree" -ef .; then
-	res="$res$(collect_files "$srctree"/localversion*)"
-fi
+# Initialize res variable
+res=""
 
-# CONFIG_LOCALVERSION and LOCALVERSION (if set)
-res="${res}${CONFIG_LOCALVERSION}${LOCALVERSION}"
-
-# scm version string if not at a tagged commit
+# If AUTO is enabled: collect localversion files AND full SCM git hash first
 if test "$CONFIG_LOCALVERSION_AUTO" = "y"; then
-	# full scm version string
-	res="$res$(scm_version)"
-else
-	# append a plus sign if the repository is not in a clean
-	# annotated or signed tagged state (as git describe only
-	# looks at signed or annotated tags - git tag -a/-s) and
-	# LOCALVERSION= is not specified
-	if test "${LOCALVERSION+set}" != "set"; then
-		scm=$(scm_version --short)
+	res="$(collect_files localversion*)"
+	if test ! "$srctree" -ef .; then
+		res="$res$(collect_files "$srctree"/localversion*)"
 	fi
+	res="$res$(scm_version)"
 fi
+
+# Append CONFIG_LOCALVERSION (.AETHER+) at the end
+res="${res}${CONFIG_LOCALVERSION}${LOCALVERSION}"
 
 echo "$res"
