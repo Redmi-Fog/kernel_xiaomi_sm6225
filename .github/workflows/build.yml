@@ -1,0 +1,61 @@
+name: Build Kernel
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential bc bison flex libssl-dev libelf-dev zip clang llvm
+
+      - name: Run Kernel Build Script
+        run: |
+          chmod +x build.sh
+          ./build.sh
+
+      - name: Verify Artifacts Before Release
+        run: |
+          echo "Verifying build outputs..."
+          
+          # Check for Kernel Image, DTBO, and DTB
+          ls
+          [ -f out/arch/arm64/boot/Image.gz ] || { echo "ERROR: Image.gz missing!"; exit 1; }
+          [ -f out/arch/arm64/boot/dtbo.img ] || { echo "ERROR: dtbo.img missing!"; exit 1; }
+          [ -f out/arch/arm64/boot/dtb ] || { echo "ERROR: dtb missing!"; exit 1; }
+
+          # Ensure the AnyKernel zip was created
+          count=$(ls *.zip 2>/dev/null | wc -l)
+          if [ "$count" -eq 0 ]; then
+            echo "ERROR: No AnyKernel zip found in workspace!"
+            exit 1
+          fi
+
+          echo "All checks passed successfully!"
+
+      - name: Get Build date
+        id: date
+        run: echo "DATE=$(date +'%d%m%Y%H%M')" >> $GITHUB_OUTPUT
+
+      - name: Create Release and Upload Files
+        uses: softprops/action-gh-release@v1
+        if: success()
+        with:
+          tag_name: ${{ github.run_id }}
+          name: ${{ steps.date.outputs.DATE }}
+          files: |
+            #out/arch/arm64/boot/Image.gz
+            #out/arch/arm64/boot/dtbo.img
+            #out/arch/arm64/boot/dtb
+            *.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
